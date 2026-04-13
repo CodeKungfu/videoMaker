@@ -1,0 +1,45 @@
+import { ref } from 'vue'
+
+export interface ToastOptions {
+  message: string
+  type?: 'success' | 'error' | 'info'
+  duration?: number
+}
+
+export interface ToastItem extends ToastOptions {
+  id: number
+}
+
+const toasts = ref<ToastItem[]>([])
+let nextId = 0
+
+export function useToast() {
+  const showToast = (options: ToastOptions) => {
+    const id = nextId++
+    const toast = {
+      id,
+      message: options.message,
+      type: options.type || 'info',
+      duration: options.duration || 3000
+    }
+    
+    toasts.value.push(toast)
+    
+    setTimeout(() => {
+      removeToast(id)
+    }, toast.duration)
+  }
+
+  const removeToast = (id: number) => {
+    const index = toasts.value.findIndex(t => t.id === id)
+    if (index > -1) {
+      toasts.value.splice(index, 1)
+    }
+  }
+
+  return {
+    toasts,
+    showToast,
+    removeToast
+  }
+}
