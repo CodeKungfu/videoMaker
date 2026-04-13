@@ -23,6 +23,7 @@ model Shot {
   projectId     Int
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   shotNumber    String   // e.g. "S01-01"
+  sortOrder     Int      @default(0) // Used for drag & drop sorting
   shotType      String?  // 近景, 中景, etc.
   subject       String?
   action        String?

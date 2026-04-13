@@ -16,6 +16,7 @@ import authRoutes from './routes/auth.js'
 import projectsRoutes from './routes/projects.js'
 import shotsRoutes from './routes/shots.js'
 import assetsRoutes from './routes/assets.js'
+import uploadRoutes from './routes/upload.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -30,6 +31,9 @@ app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+// serve static uploads
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')))
+
 /**
  * API Routes
  */
@@ -37,6 +41,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/projects', projectsRoutes)
 app.use('/api/shots', shotsRoutes)
 app.use('/api/assets', assetsRoutes)
+app.use('/api/upload', uploadRoutes)
 
 /**
  * health

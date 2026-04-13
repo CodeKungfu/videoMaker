@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
   try {
     const shots = await prisma.shot.findMany({
       where: { projectId: parseInt(projectId as string) },
-      orderBy: { shotNumber: 'asc' }
+      orderBy: { sortOrder: 'asc' }
     });
     res.json({ success: true, data: shots });
   } catch (error: any) {
@@ -22,10 +22,18 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { projectId, shotNumber, shotType, subject, action, emotion, scene, dialog } = req.body;
   try {
+    // get current max sortOrder
+    const maxShot = await prisma.shot.findFirst({
+      where: { projectId: parseInt(projectId) },
+      orderBy: { sortOrder: 'desc' }
+    });
+    const nextOrder = maxShot ? maxShot.sortOrder + 1 : 0;
+
     const shot = await prisma.shot.create({
       data: {
         projectId: parseInt(projectId),
         shotNumber,
+        sortOrder: nextOrder,
         shotType,
         subject,
         action,
@@ -50,6 +58,23 @@ router.put('/:id', async (req, res) => {
       data
     });
     res.json({ success: true, data: shot });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Reorder shots
+router.post('/reorder', async (req, res) => {
+  const { projectId, shotIds } = req.body; // array of shot ids in new order
+  try {
+    const transactions = shotIds.map((id: number, index: number) => {
+      return prisma.shot.update({
+        where: { id },
+        data: { sortOrder: index }
+      });
+    });
+    await prisma.$transaction(transactions);
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

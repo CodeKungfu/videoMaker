@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Image as ImageIcon, Sparkles, Check, RefreshCw, Settings2, X, Save } from 'lucide-vue-next'
+import { Image as ImageIcon, Sparkles, Check, RefreshCw, Settings2, X, Save, Upload } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const projectId = route.params.id
+const { showToast } = useToast()
 
 const shots = ref<any[]>([])
 const assets = ref<any[]>([])
@@ -110,6 +112,41 @@ async function simulateGenerate(shot: any) {
   }
 }
 
+async function handleManualUpload(event: Event, shot: any) {
+  const targetEl = event.target as HTMLInputElement
+  const file = targetEl.files?.[0]
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  shot.status = 'GENERATING'
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    })
+    const json = await res.json()
+    if (json.success) {
+      shot.status = 'COMPLETED'
+      shot.finalImageUrl = json.url
+      
+      await fetch(`/api/shots/${shot.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'COMPLETED', finalImageUrl: json.url })
+      })
+      showToast({ message: '手动上传生图成功', type: 'success' })
+    }
+  } catch (e) {
+    console.error(e)
+    shot.status = 'PENDING'
+    showToast({ message: '手动上传失败', type: 'error' })
+  } finally {
+    targetEl.value = ''
+  }
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -195,22 +232,34 @@ onMounted(() => {
         </div>
 
         <!-- Right: Generation Result -->
-        <div class="w-full md:w-2/3 p-6 flex items-center justify-center bg-[#0a0a0a] min-h-[240px]">
+        <div class="w-full md:w-2/3 p-6 flex flex-col items-center justify-center bg-[#0a0a0a] min-h-[240px] relative group">
           <div v-if="shot.status === 'GENERATING'" class="flex flex-col items-center text-emerald-500">
             <div class="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
             <p class="text-sm font-medium animate-pulse">正在调度渲染集群...</p>
           </div>
           
-          <div v-else-if="shot.finalImageUrl" class="relative group w-full h-full flex items-center justify-center">
+          <div v-else-if="shot.finalImageUrl" class="relative w-full h-full flex items-center justify-center">
             <img :src="shot.finalImageUrl" class="max-h-full max-w-full object-contain rounded shadow-2xl ring-1 ring-zinc-800" />
             <div class="absolute top-2 right-2 bg-emerald-500 text-black text-xs font-bold px-2 py-1 rounded shadow flex items-center gap-1">
               <Check class="w-3 h-3" /> 已定稿
+            </div>
+            
+            <div class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <label class="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/90 hover:bg-zinc-800 text-white text-xs rounded-md cursor-pointer backdrop-blur border border-zinc-700 shadow-lg">
+                <Upload class="w-3 h-3" /> 手动替换
+                <input type="file" accept="image/*" class="hidden" @change="(e) => handleManualUpload(e, shot)" />
+              </label>
             </div>
           </div>
           
           <div v-else class="text-zinc-600 flex flex-col items-center">
             <ImageIcon class="w-12 h-12 mb-3 opacity-50" />
-            <p class="text-sm">等待生成</p>
+            <p class="text-sm mb-4">等待生成</p>
+            
+            <label class="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-sm rounded-lg cursor-pointer transition-colors border border-zinc-800">
+              <Upload class="w-4 h-4" /> 本地上传生图
+              <input type="file" accept="image/*" class="hidden" @change="(e) => handleManualUpload(e, shot)" />
+            </label>
           </div>
         </div>
       </div>

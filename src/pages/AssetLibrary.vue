@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Plus, Trash2, User, Image as ImageIcon, Box, Edit2, X, Check } from 'lucide-vue-next'
+import { Plus, Trash2, User, Image as ImageIcon, Box, Edit2, X, Check, Upload, Loader2 } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const projectId = route.params.id
+const { showToast } = useToast()
 
 const assets = ref<any[]>([])
 const loading = ref(true)
+const uploading = ref(false)
 
 const defaultNewAsset = {
   type: 'ROLE',
@@ -100,6 +103,38 @@ async function saveEdit() {
   }
 }
 
+async function handleUpload(event: Event, target: 'new' | 'edit') {
+  const targetEl = event.target as HTMLInputElement
+  const file = targetEl.files?.[0]
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  uploading.value = true
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    })
+    const json = await res.json()
+    if (json.success) {
+      if (target === 'new') {
+        newAsset.value.referenceUrl = json.url
+      } else {
+        editingAsset.value.referenceUrl = json.url
+      }
+      showToast({ message: '图片上传成功', type: 'success' })
+    }
+  } catch (e) {
+    console.error(e)
+    showToast({ message: '图片上传失败', type: 'error' })
+  } finally {
+    uploading.value = false
+    targetEl.value = '' // clear input
+  }
+}
+
 onMounted(() => {
   fetchAssets()
 })
@@ -158,6 +193,28 @@ onMounted(() => {
               <textarea v-model="newAsset.forbidden" rows="2" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all resize-none" placeholder="现代服饰，眼镜，短发..."></textarea>
             </div>
             
+            <div>
+              <label class="block text-xs font-medium text-zinc-400 mb-1.5">参考图 (可选)</label>
+              <div class="relative w-full h-32 bg-zinc-950 border-2 border-dashed border-zinc-800 hover:border-emerald-500/50 rounded-lg flex flex-col items-center justify-center text-zinc-500 hover:text-emerald-500 transition-all cursor-pointer overflow-hidden group">
+                <input type="file" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="(e) => handleUpload(e, 'new')" :disabled="uploading" />
+                <div v-if="uploading && newAsset.referenceUrl === ''" class="flex flex-col items-center">
+                  <Loader2 class="w-6 h-6 animate-spin mb-2 text-emerald-500" />
+                  <span class="text-xs">上传中...</span>
+                </div>
+                <div v-else-if="newAsset.referenceUrl" class="w-full h-full relative">
+                  <img :src="newAsset.referenceUrl" class="w-full h-full object-cover opacity-60 group-hover:opacity-30 transition-opacity" />
+                  <div class="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                    <Upload class="w-6 h-6 mb-2 drop-shadow-md" />
+                    <span class="text-xs font-bold drop-shadow-md">点击更换</span>
+                  </div>
+                </div>
+                <div v-else class="flex flex-col items-center">
+                  <Upload class="w-6 h-6 mb-2" />
+                  <span class="text-xs">点击或拖拽上传图片</span>
+                </div>
+              </div>
+            </div>
+            
             <button 
               @click="addAsset"
               :disabled="!newAsset.name"
@@ -202,18 +259,23 @@ onMounted(() => {
                 </div>
               </div>
               
-              <div class="p-4 space-y-3">
-                <div v-if="asset.anchors">
-                  <span class="text-[10px] uppercase tracking-wider text-emerald-500 font-bold mb-1 block">外形锚点</span>
-                  <p class="text-sm text-zinc-300">{{ asset.anchors }}</p>
+              <div class="p-4 flex gap-4">
+                <div v-if="asset.referenceUrl" class="w-24 h-24 shrink-0 rounded-lg overflow-hidden border border-zinc-800">
+                  <img :src="asset.referenceUrl" class="w-full h-full object-cover" />
                 </div>
-                <div v-if="asset.clothing && asset.type === 'ROLE'">
-                  <span class="text-[10px] uppercase tracking-wider text-blue-400 font-bold mb-1 block">服装设定</span>
-                  <p class="text-sm text-zinc-300">{{ asset.clothing }}</p>
-                </div>
-                <div v-if="asset.forbidden">
-                  <span class="text-[10px] uppercase tracking-wider text-red-400 font-bold mb-1 block">禁用元素</span>
-                  <p class="text-sm text-zinc-400 line-through decoration-red-500/30">{{ asset.forbidden }}</p>
+                <div class="flex-1 space-y-3">
+                  <div v-if="asset.anchors">
+                    <span class="text-[10px] uppercase tracking-wider text-emerald-500 font-bold mb-1 block">外形锚点</span>
+                    <p class="text-sm text-zinc-300">{{ asset.anchors }}</p>
+                  </div>
+                  <div v-if="asset.clothing && asset.type === 'ROLE'">
+                    <span class="text-[10px] uppercase tracking-wider text-blue-400 font-bold mb-1 block">服装设定</span>
+                    <p class="text-sm text-zinc-300">{{ asset.clothing }}</p>
+                  </div>
+                  <div v-if="asset.forbidden">
+                    <span class="text-[10px] uppercase tracking-wider text-red-400 font-bold mb-1 block">禁用元素</span>
+                    <p class="text-sm text-zinc-400 line-through decoration-red-500/30">{{ asset.forbidden }}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -242,6 +304,20 @@ onMounted(() => {
               <div>
                 <label class="block text-[10px] text-red-400 mb-1">禁用元素</label>
                 <textarea v-model="editingAsset.forbidden" rows="2" class="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white resize-none"></textarea>
+              </div>
+              <div>
+                <label class="block text-[10px] text-zinc-400 mb-1">参考图</label>
+                <div class="relative w-24 h-24 bg-zinc-950 border border-zinc-800 rounded cursor-pointer group overflow-hidden">
+                  <input type="file" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="(e) => handleUpload(e, 'edit')" :disabled="uploading" />
+                  <img v-if="editingAsset.referenceUrl" :src="editingAsset.referenceUrl" class="w-full h-full object-cover" />
+                  <div class="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Upload class="w-4 h-4 text-white mb-1" />
+                    <span class="text-[10px] text-white">更换</span>
+                  </div>
+                  <div v-if="!editingAsset.referenceUrl" class="absolute inset-0 flex items-center justify-center text-zinc-600">
+                    <Upload class="w-5 h-5" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

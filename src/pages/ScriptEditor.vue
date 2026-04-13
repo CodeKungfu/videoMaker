@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Plus, Trash2, GripVertical, Check } from 'lucide-vue-next'
+import { Plus, Trash2, GripVertical, Check, Copy, Eraser } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const projectId = route.params.id
+const { showToast } = useToast()
 
 const shots = ref<any[]>([])
 const loading = ref(true)
@@ -44,19 +46,90 @@ async function addShot() {
     const json = await res.json()
     if (json.success) {
       shots.value.push(json.data)
-      newShot.value = { shotNumber: '', shotType: '近景', subject: '', action: '', emotion: '', scene: '', dialog: '' }
+      // preserve scene but clear subject/action to speed up typing next
+      newShot.value = { 
+        ...newShot.value, 
+        shotNumber: '', 
+        subject: '', 
+        action: '', 
+        dialog: '' 
+      }
+      showToast({ message: '镜头添加成功', type: 'success' })
     }
   } catch (e) {
     console.error(e)
+    showToast({ message: '添加失败', type: 'error' })
+  }
+}
+
+async function duplicateShot(shot: any) {
+  newShot.value = {
+    shotNumber: shot.shotNumber + '-copy',
+    shotType: shot.shotType,
+    subject: shot.subject,
+    action: shot.action,
+    emotion: shot.emotion,
+    scene: shot.scene,
+    dialog: shot.dialog
+  }
+  showToast({ message: '已复制参数到输入框', type: 'info' })
+}
+
+function clearForm() {
+  newShot.value = {
+    shotNumber: '',
+    shotType: '近景',
+    subject: '',
+    action: '',
+    emotion: '',
+    scene: '',
+    dialog: ''
   }
 }
 
 async function deleteShot(id: number) {
+  if (!confirm('确认删除该镜头吗？')) return
   try {
     await fetch(`/api/shots/${id}`, { method: 'DELETE' })
     shots.value = shots.value.filter(s => s.id !== id)
+    showToast({ message: '镜头已删除', type: 'success' })
   } catch (e) {
     console.error(e)
+    showToast({ message: '删除失败', type: 'error' })
+  }
+}
+
+// Simple drag & drop logic
+let draggedIndex: number | null = null
+
+function onDragStart(index: number) {
+  draggedIndex = index
+}
+
+function onDragOver(event: DragEvent) {
+  event.preventDefault()
+}
+
+async function onDrop(targetIndex: number) {
+  if (draggedIndex === null || draggedIndex === targetIndex) return
+  
+  const movedShot = shots.value.splice(draggedIndex, 1)[0]
+  shots.value.splice(targetIndex, 0, movedShot)
+  
+  draggedIndex = null
+  
+  // save order to backend
+  try {
+    await fetch('/api/shots/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: projectId,
+        shotIds: shots.value.map(s => s.id)
+      })
+    })
+  } catch (e) {
+    console.error('Failed to reorder shots', e)
   }
 }
 
@@ -95,9 +168,17 @@ onMounted(() => {
 
     <!-- Shot List -->
     <div v-else class="space-y-6 mb-12">
-      <div v-for="(shot, index) in shots" :key="shot.id" class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-lg group">
+      <div 
+        v-for="(shot, index) in shots" 
+        :key="shot.id" 
+        class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-lg group transition-all"
+        draggable="true"
+        @dragstart="onDragStart(index)"
+        @dragover="onDragOver"
+        @drop="onDrop(index)"
+      >
         <div class="flex gap-4">
-          <div class="flex flex-col items-center pt-1 cursor-grab text-zinc-600 hover:text-zinc-400">
+          <div class="flex flex-col items-center pt-1 cursor-grab text-zinc-600 hover:text-emerald-500 transition-colors">
             <GripVertical class="w-5 h-5 mb-2" />
             <div class="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-300 border border-zinc-700">
               {{ index + 1 }}
@@ -113,8 +194,11 @@ onMounted(() => {
               <label class="block text-xs font-medium text-zinc-500 mb-1">景别</label>
               <div class="text-zinc-300 text-sm">{{ shot.shotType }}</div>
             </div>
-            <div class="col-span-8 flex justify-end">
-              <button @click="deleteShot(shot.id)" class="text-zinc-500 hover:text-red-400 p-2 rounded hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100">
+            <div class="col-span-8 flex justify-end gap-2">
+              <button @click="duplicateShot(shot)" class="text-zinc-500 hover:text-blue-400 p-2 rounded hover:bg-blue-500/10 transition-colors opacity-0 group-hover:opacity-100" title="复制参数到输入框">
+                <Copy class="w-4 h-4" />
+              </button>
+              <button @click="deleteShot(shot.id)" class="text-zinc-500 hover:text-red-400 p-2 rounded hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100" title="删除">
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
@@ -156,10 +240,15 @@ onMounted(() => {
     <!-- Add Shot Form -->
     <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl relative overflow-hidden">
       <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-      <h3 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
-        <Plus class="w-5 h-5 text-emerald-500" />
-        添加新镜头
-      </h3>
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <Plus class="w-5 h-5 text-emerald-500" />
+          添加新镜头
+        </h3>
+        <button @click="clearForm" class="text-xs flex items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-colors">
+          <Eraser class="w-3 h-3" /> 清空表单
+        </button>
+      </div>
       
       <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
         <div class="md:col-span-3">
