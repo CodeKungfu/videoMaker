@@ -30,7 +30,8 @@ model Shot {
   emotion       String?
   scene         String?
   dialog        String?
-  status        String   @default("PENDING") // PENDING, GENERATING, COMPLETED
+  status        String   @default("PENDING") // PENDING, GENERATING, CANDIDATES_READY, COMPLETED
+  candidates    String?  // JSON stringified array of candidate image URLs
   finalImageUrl String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

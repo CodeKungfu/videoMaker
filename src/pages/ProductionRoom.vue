@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Image as ImageIcon, Sparkles, Check, RefreshCw, Settings2, X, Save, Upload } from 'lucide-vue-next'
+import { Image as ImageIcon, Sparkles, Check, RefreshCw, Settings2, X, Save, Upload, RotateCcw } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
@@ -83,6 +83,37 @@ function cancelEditPrompt(shotId: number) {
   // Optionally reset to generated if they haven't saved before, but we'll just keep the draft.
 }
 
+function getCandidates(shot: any): string[] {
+  if (!shot.candidates) return []
+  try {
+    return JSON.parse(shot.candidates)
+  } catch {
+    return []
+  }
+}
+
+async function pickCandidate(shot: any, url: string) {
+  shot.finalImageUrl = url
+  shot.status = 'COMPLETED'
+  try {
+    await fetch(`/api/shots/${shot.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'COMPLETED', finalImageUrl: url })
+    })
+    showToast({ message: '已选定此图为最终定稿', type: 'success' })
+  } catch (e) {
+    console.error(e)
+    showToast({ message: '保存失败', type: 'error' })
+  }
+}
+
+async function reroll(shot: any) {
+  shot.finalImageUrl = null
+  shot.candidates = null
+  await simulateGenerate(shot)
+}
+
 async function simulateGenerate(shot: any) {
   shot.status = 'GENERATING'
   try {
@@ -95,17 +126,26 @@ async function simulateGenerate(shot: any) {
     // Simulate generation delay
     setTimeout(async () => {
       const promptData = buildPrompt(shot)
-      // Use a placeholder image from an AI generator
-      const mockImageUrl = `https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=${encodeURIComponent(promptData.positive)}&image_size=landscape_16_9`
-      shot.status = 'COMPLETED'
-      shot.finalImageUrl = mockImageUrl
+      const basePrompt = encodeURIComponent(promptData.positive)
+      
+      // Generate 4 mock images by appending different seeds to the prompt
+      const mockUrls = [
+        `https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=${basePrompt}&image_size=landscape_16_9&seed=1`,
+        `https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=${basePrompt}&image_size=landscape_16_9&seed=2`,
+        `https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=${basePrompt}&image_size=landscape_16_9&seed=3`,
+        `https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=${basePrompt}&image_size=landscape_16_9&seed=4`
+      ]
+      
+      shot.status = 'CANDIDATES_READY'
+      shot.candidates = JSON.stringify(mockUrls)
       
       await fetch(`/api/shots/${shot.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'COMPLETED', finalImageUrl: mockImageUrl })
+        body: JSON.stringify({ status: 'CANDIDATES_READY', candidates: shot.candidates })
       })
-    }, 2000)
+      showToast({ message: '抽卡完成，请挑选一张定稿', type: 'info' })
+    }, 3000)
   } catch (e) {
     console.error(e)
     shot.status = 'PENDING'
@@ -214,39 +254,59 @@ onMounted(() => {
           </div>
           
           <button 
-            v-if="shot.status !== 'GENERATING'"
-            @click="simulateGenerate(shot)"
+            v-if="shot.status === 'PENDING' || shot.status === 'COMPLETED' || shot.status === 'CANDIDATES_READY'"
+            @click="reroll(shot)"
             class="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-800 hover:bg-emerald-500 hover:text-black text-white font-medium rounded-lg transition-all border border-zinc-700 hover:border-emerald-500 group"
           >
             <Sparkles class="w-4 h-4 text-emerald-500 group-hover:text-black" />
-            {{ shot.finalImageUrl ? '重新生成' : '开始生成' }}
+            {{ (shot.status === 'COMPLETED' || shot.status === 'CANDIDATES_READY') ? '重新抽卡 (Re-roll)' : '开始抽卡 (Roll)' }}
           </button>
           <button 
-            v-else
+            v-else-if="shot.status === 'GENERATING'"
             disabled
             class="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-800 text-emerald-500 font-medium rounded-lg border border-zinc-700 opacity-80 cursor-not-allowed"
           >
             <RefreshCw class="w-4 h-4 animate-spin" />
-            生成中...
+            抽卡生成中...
           </button>
         </div>
 
         <!-- Right: Generation Result -->
         <div class="w-full md:w-2/3 p-6 flex flex-col items-center justify-center bg-[#0a0a0a] min-h-[240px] relative group">
-          <div v-if="shot.status === 'GENERATING'" class="flex flex-col items-center text-emerald-500">
-            <div class="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <p class="text-sm font-medium animate-pulse">正在调度渲染集群...</p>
+          <div v-if="shot.status === 'GENERATING'" class="grid grid-cols-2 gap-2 w-full h-full max-h-[360px]">
+            <div v-for="i in 4" :key="i" class="bg-zinc-800/50 animate-pulse rounded-lg flex items-center justify-center">
+              <div class="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+            </div>
           </div>
           
-          <div v-else-if="shot.finalImageUrl" class="relative w-full h-full flex items-center justify-center">
+          <div v-else-if="shot.status === 'CANDIDATES_READY' && getCandidates(shot).length > 0" class="grid grid-cols-2 gap-2 w-full h-full max-h-[360px]">
+            <div 
+              v-for="(url, idx) in getCandidates(shot)" 
+              :key="idx" 
+              class="relative group/candidate rounded-lg overflow-hidden border-2 border-transparent hover:border-emerald-500 transition-all cursor-pointer"
+            >
+              <img :src="url" class="w-full h-full object-cover" />
+              <div class="absolute inset-0 bg-black/50 opacity-0 group/candidate-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
+                <button @click="pickCandidate(shot, url)" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-lg transform scale-90 group/candidate-hover:scale-100 transition-all flex items-center gap-2">
+                  <Check class="w-4 h-4" /> 选定此张
+                </button>
+              </div>
+              <div class="absolute top-1 left-1 bg-black/80 text-white text-[10px] px-1.5 rounded">Seed: {{ idx + 1 }}</div>
+            </div>
+          </div>
+          
+          <div v-else-if="shot.finalImageUrl && shot.status === 'COMPLETED'" class="relative w-full h-full flex items-center justify-center">
             <img :src="shot.finalImageUrl" class="max-h-full max-w-full object-contain rounded shadow-2xl ring-1 ring-zinc-800" />
             <div class="absolute top-2 right-2 bg-emerald-500 text-black text-xs font-bold px-2 py-1 rounded shadow flex items-center gap-1">
               <Check class="w-3 h-3" /> 已定稿
             </div>
             
-            <div class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <label class="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/90 hover:bg-zinc-800 text-white text-xs rounded-md cursor-pointer backdrop-blur border border-zinc-700 shadow-lg">
-                <Upload class="w-3 h-3" /> 手动替换
+            <div class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+              <button @click="reroll(shot)" class="flex items-center gap-1 px-3 py-1.5 bg-zinc-900/90 hover:bg-zinc-800 text-white text-xs rounded-md cursor-pointer backdrop-blur border border-zinc-700 shadow-lg">
+                <RotateCcw class="w-3 h-3" /> 重新抽卡
+              </button>
+              <label class="flex items-center gap-1 px-3 py-1.5 bg-zinc-900/90 hover:bg-zinc-800 text-white text-xs rounded-md cursor-pointer backdrop-blur border border-zinc-700 shadow-lg">
+                <Upload class="w-3 h-3" /> 本地替换
                 <input type="file" accept="image/*" class="hidden" @change="(e) => handleManualUpload(e, shot)" />
               </label>
             </div>
@@ -254,10 +314,10 @@ onMounted(() => {
           
           <div v-else class="text-zinc-600 flex flex-col items-center">
             <ImageIcon class="w-12 h-12 mb-3 opacity-50" />
-            <p class="text-sm mb-4">等待生成</p>
+            <p class="text-sm mb-4">等待抽卡</p>
             
             <label class="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-sm rounded-lg cursor-pointer transition-colors border border-zinc-800">
-              <Upload class="w-4 h-4" /> 本地上传生图
+              <Upload class="w-4 h-4" /> 本地上传定稿
               <input type="file" accept="image/*" class="hidden" @change="(e) => handleManualUpload(e, shot)" />
             </label>
           </div>
