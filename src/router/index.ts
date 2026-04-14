@@ -5,12 +5,18 @@ import ScriptEditor from '@/pages/ScriptEditor.vue'
 import AssetLibrary from '@/pages/AssetLibrary.vue'
 import ProductionRoom from '@/pages/ProductionRoom.vue'
 import ComposeExport from '@/pages/ComposeExport.vue'
+import Settings from '@/pages/Settings.vue'
 
 const routes = [
   {
     path: '/',
     name: 'dashboard',
     component: Dashboard,
+  },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: Settings,
   },
   {
     path: '/projects/:id',

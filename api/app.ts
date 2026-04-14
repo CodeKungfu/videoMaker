@@ -7,16 +7,16 @@ import express, {
   type Response,
   type NextFunction,
 } from 'express'
+import express from 'express'
 import cors from 'cors'
 import path from 'path'
-import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
-
 import projectsRoutes from './routes/projects.js'
 import shotsRoutes from './routes/shots.js'
 import assetsRoutes from './routes/assets.js'
 import uploadRoutes from './routes/upload.js'
+import settingsRoutes from './routes/settings.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -42,6 +42,7 @@ app.use('/api/projects', projectsRoutes)
 app.use('/api/shots', shotsRoutes)
 app.use('/api/assets', assetsRoutes)
 app.use('/api/upload', uploadRoutes)
+app.use('/api/settings', settingsRoutes)
 
 /**
  * health

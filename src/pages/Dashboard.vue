@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, FolderOpen, MoreVertical, Trash2 } from 'lucide-vue-next'
+import { Plus, FolderOpen, MoreVertical, Trash2, Settings } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
@@ -87,13 +87,22 @@ onMounted(() => {
         <h1 class="text-3xl font-bold text-white tracking-tight">AI漫剧工作台</h1>
         <p class="text-zinc-400 mt-2">管理你的漫剧项目流水线</p>
       </div>
-      <button 
-        @click="showCreateModal = true"
-        class="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
-      >
-        <Plus class="w-5 h-5" />
-        新建项目
-      </button>
+      <div class="flex items-center gap-4">
+        <button 
+          @click="router.push('/settings')"
+          class="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white font-medium rounded-lg transition-all"
+        >
+          <Settings class="w-5 h-5" />
+          系统设置
+        </button>
+        <button 
+          @click="showCreateModal = true"
+          class="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+        >
+          <Plus class="w-5 h-5" />
+          新建项目
+        </button>
+      </div>
     </header>
 
     <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
