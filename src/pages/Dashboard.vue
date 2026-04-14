@@ -121,10 +121,11 @@ onMounted(() => {
         v-for="project in projects" 
         :key="project.id"
         @click="router.push(`/projects/${project.id}/script`)"
-        class="group relative bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 rounded-xl p-6 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-900/10 overflow-hidden flex flex-col h-56"
+        class="group relative bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 rounded-xl p-6 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-emerald-900/20 overflow-hidden flex flex-col h-56"
       >
-        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <div class="flex justify-between items-start mb-4 relative">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-400 transform -translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+        
+        <div class="flex justify-between items-start mb-4 relative z-10">
           <h3 class="text-xl font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors truncate pr-4">{{ project.title }}</h3>
           
           <div class="relative" @click.stop>

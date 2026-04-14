@@ -84,22 +84,32 @@ async function handleExport() {
   
   exporting.value = true
   try {
+    showToast({ message: '开始渲染长图，请稍候...', type: 'info', duration: 2000 })
+    
+    // Add a small delay to allow UI to update loading state before heavy JS task blocks main thread
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
     const canvas = await html2canvas(comicContainer.value, {
       useCORS: true,
       scale: 2,
-      backgroundColor: comicStyle.value.bgColor
+      backgroundColor: comicStyle.value.bgColor,
+      logging: false, // disable console logs during export
+      allowTaint: true,
+      imageTimeout: 15000 // wait up to 15s for external images to load
     })
     
-    const url = canvas.toDataURL('image/jpeg', 0.9)
+    const url = canvas.toDataURL('image/jpeg', 0.92)
     const link = document.createElement('a')
-    link.download = `comic-export-${projectId}-${Date.now()}.jpg`
+    link.download = `${project.value?.title || 'comic'}-export-${Date.now()}.jpg`
     link.href = url
+    document.body.appendChild(link)
     link.click()
+    document.body.removeChild(link)
     
     showToast({ message: '长图导出成功', type: 'success' })
   } catch (e) {
     console.error('Export failed', e)
-    showToast({ message: '导出长图失败，请稍后重试', type: 'error' })
+    showToast({ message: '导出长图失败，可能是由于网络图片加载超时或跨域限制，请稍后重试', type: 'error', duration: 5000 })
   } finally {
     exporting.value = false
   }
