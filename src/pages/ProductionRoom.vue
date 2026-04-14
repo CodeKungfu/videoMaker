@@ -273,9 +273,16 @@ onMounted(() => {
 
         <!-- Right: Generation Result -->
         <div class="w-full md:w-2/3 p-6 flex flex-col items-center justify-center bg-[#0a0a0a] min-h-[240px] relative group">
-          <div v-if="shot.status === 'GENERATING'" class="grid grid-cols-2 gap-2 w-full h-full max-h-[360px]">
-            <div v-for="i in 4" :key="i" class="bg-zinc-800/50 animate-pulse rounded-lg flex items-center justify-center">
-              <div class="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+          <div v-if="shot.status === 'GENERATING'" class="w-full h-full min-h-[240px] flex flex-col items-center justify-center relative">
+            <div class="grid grid-cols-2 gap-2 w-full h-full max-h-[360px] absolute inset-0 p-6">
+              <div v-for="i in 4" :key="i" class="bg-zinc-800/30 rounded-lg flex items-center justify-center overflow-hidden relative">
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-700/20 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]"></div>
+              </div>
+            </div>
+            <div class="z-10 flex flex-col items-center bg-black/60 p-4 rounded-xl backdrop-blur-sm border border-zinc-800">
+              <div class="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-3"></div>
+              <p class="text-sm font-medium text-emerald-400 animate-pulse">正在调度渲染集群...</p>
+              <p class="text-xs text-zinc-400 mt-1">预计需要 3-5 秒，请稍候</p>
             </div>
           </div>
           
