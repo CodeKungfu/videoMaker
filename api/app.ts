@@ -7,9 +7,9 @@ import express, {
   type Response,
   type NextFunction,
 } from 'express'
-import express from 'express'
 import cors from 'cors'
 import path from 'path'
+import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import projectsRoutes from './routes/projects.js'
